@@ -67,43 +67,42 @@ def api_leer_codigos():
 @app.route("/api/leer-codigosV2", methods=["POST"])
 def api_leer_codigosV2():
     try:
-        data = request.get_json()
+       
+        data = request.get_json(force=True)
+             
+        if "body" not in data or "$multipart" not in data["body"] or len(data["body"]["$multipart"]) == 0:
+            return jsonify({"error": "No se encontró contenido en $multipart"}), 400
 
-        if not data or "$content" not in data or "$content-type" not in data:
-            return jsonify({"error": "Faltan campos $content o $content-type"}), 400
+       
+        archivo = data["body"]["$multipart"][0]
 
-        # Decodificar Base64
-        imagen_base64 = data["$content"]
+        
+        if "body" not in archivo or "$content" not in archivo["body"]:
+            return jsonify({"error": "No se encontró el contenido del archivo en $multipart"}), 400
+
+        
+        imagen_base64 = archivo["body"]["$content"]
+
+        content_type = archivo["headers"]["Content-Type"]
+
+        if content_type != "image/jpeg":
+            return jsonify({"error": f"Tipo de contenido no soportado: {content_type}"}), 400
+
         try:
+          
             imagen_bytes = base64.b64decode(imagen_base64)
         except Exception as e:
-            return jsonify({"error": f"Error al decodificar imagen: {str(e)}"}), 400
+            return jsonify({"error": f"Error al decodificar base64: {str(e)}"}), 400
 
-        # Convertir a imagen numpy
         imagen_np = cv2.imdecode(np.frombuffer(imagen_bytes, np.uint8), cv2.IMREAD_COLOR)
+
         if imagen_np is None:
             return jsonify({"error": "No se pudo decodificar la imagen"}), 400
 
-        # Procesar imagen
+       
         codigos_detectados = leer_codigos(imagen_np)
 
-        # Guardar archivo
-        nombre_archivo = f"{uuid.uuid4().hex}.jpg"
-        ruta_guardado = os.path.join(UPLOAD_FOLDER, nombre_archivo)
-        cv2.imwrite(ruta_guardado, imagen_np)
-
-        resultado_json = codigos_detectados
-
-        # Enviar a otro sistema (opcional)
-        try:
-            response = requests.post(DESTINO_URL, json=resultado_json, timeout=5)
-            resultado = response.json()
-        except Exception as e:
-            resultado = {
-                "respuesta_envio": {"error": str(e)}
-            }
-
-        return jsonify(resultado)
+        return jsonify(codigos_detectados)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
