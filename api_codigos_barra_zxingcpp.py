@@ -101,8 +101,22 @@ def api_leer_codigosV2():
 
        
         codigos_detectados = leer_codigos(imagen_np)
+        nombre_archivo = f"{uuid.uuid4().hex}.jpg"
+        ruta_guardado = os.path.join(UPLOAD_FOLDER, nombre_archivo)
+        cv2.imwrite(ruta_guardado, imagen_np)
 
-        return jsonify(codigos_detectados)
+        resultado_json =codigos_detectados
+        try:
+            response = requests.post(DESTINO_URL, json=resultado_json, timeout=5)
+            resultado = response.json()
+         
+        except Exception as e:
+            resultado_json["respuesta_envio"] = {
+                "error": str(e)
+            }
+
+        return jsonify(resultado)
+
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
