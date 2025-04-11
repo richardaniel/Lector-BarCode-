@@ -67,29 +67,18 @@ def api_leer_codigos():
 @app.route("/api/leer-codigosV2", methods=["POST"])
 def api_leer_codigosV2():
     try:
-       
         data = request.get_json(force=True)
-             
-        if "body" not in data or "$multipart" not in data["body"] or len(data["body"]["$multipart"]) == 0:
-            return jsonify({"error": "No se encontró contenido en $multipart"}), 400
 
-       
-        archivo = data["body"]["$multipart"][0]
+        if "body" not in data or "$content" not in data["body"]:
+            return jsonify({"error": "No se encontró contenido en el body"}), 400
 
-        
-        if "body" not in archivo or "$content" not in archivo["body"]:
-            return jsonify({"error": "No se encontró el contenido del archivo en $multipart"}), 400
-
-        
-        imagen_base64 = archivo["body"]["$content"]
-
-        content_type = archivo["headers"]["Content-Type"]
+        imagen_base64 = data["body"]["$content"]
+        content_type = data["body"].get("$content-type", "")
 
         if content_type != "image/jpeg":
             return jsonify({"error": f"Tipo de contenido no soportado: {content_type}"}), 400
 
         try:
-          
             imagen_bytes = base64.b64decode(imagen_base64)
         except Exception as e:
             return jsonify({"error": f"Error al decodificar base64: {str(e)}"}), 400
@@ -99,13 +88,14 @@ def api_leer_codigosV2():
         if imagen_np is None:
             return jsonify({"error": "No se pudo decodificar la imagen"}), 400
 
-       
         codigos_detectados = leer_codigos(imagen_np)
+
         nombre_archivo = f"{uuid.uuid4().hex}.jpg"
         ruta_guardado = os.path.join(UPLOAD_FOLDER, nombre_archivo)
         cv2.imwrite(ruta_guardado, imagen_np)
-
         resultado_json =codigos_detectados
+        
+
         try:
             response = requests.post(DESTINO_URL, json=resultado_json, timeout=5)
             resultado = response.json()
@@ -117,6 +107,8 @@ def api_leer_codigosV2():
 
         return jsonify(resultado)
 
+
+        return jsonify(resultado_json)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
